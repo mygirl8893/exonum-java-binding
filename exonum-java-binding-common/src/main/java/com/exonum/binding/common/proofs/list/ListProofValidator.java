@@ -45,21 +45,11 @@ public final class ListProofValidator<E> implements ListProofVisitor {
 
   private final HashFunction hashFunction;
 
-  private final int expectedLeafDepth;
-
   private final NavigableMap<Long, E> elements;
 
   private long index;
 
   private int depth;
-
-  /**
-   * Whether a proof tree is «balanced», i.e., contains leaf elements at the bottom level
-   * of the tree only.
-   *
-   * <p>If the proof tree is <strong>not</strong> balanced, it is not valid.
-   */
-  private boolean isBalanced;
 
   private HashCode hash;
 
@@ -67,52 +57,41 @@ public final class ListProofValidator<E> implements ListProofVisitor {
     * Creates a new ListProofValidator.
    *
    * @param expectedRootHash an expected value of a root hash
-   * @param numElements the number of elements in the proof list.
-   *                    The same as the number of leaf nodes in the Merkle tree.
    * @param serializer a serializer of list elements
    */
-  public ListProofValidator(byte[] expectedRootHash, long numElements, Serializer<E> serializer) {
-    this(HashCode.fromBytes(expectedRootHash), numElements, serializer);
+  public ListProofValidator(byte[] expectedRootHash, Serializer<E> serializer) {
+    this(HashCode.fromBytes(expectedRootHash), serializer);
   }
 
   /**
    * Creates a new ListProofValidator.
    *
    * @param expectedRootHash an expected value of a root hash
-   * @param numElements the number of elements in the proof list.
-   *                    The same as the number of leaf nodes in the Merkle tree.
    * @param serializer a serializer of list elements
    */
-  public ListProofValidator(HashCode expectedRootHash, long numElements, Serializer<E> serializer) {
-    this(expectedRootHash, numElements, serializer, Hashing.defaultHashFunction());
+  public ListProofValidator(HashCode expectedRootHash, Serializer<E> serializer) {
+    this(expectedRootHash,  serializer, Hashing.defaultHashFunction());
   }
 
   @VisibleForTesting  // to easily inject a mock of a hash function.
-  ListProofValidator(HashCode expectedRootHash, long numElements, Serializer<E> serializer,
+  ListProofValidator(HashCode expectedRootHash, Serializer<E> serializer,
                      HashFunction hashFunction) {
-    checkArgument(0 < numElements, "numElements (%s) must be positive", numElements);
+    //checkArgument(0 < numElements, "numElements (%s) must be positive", numElements);
     this.expectedRootHash = checkNotNull(expectedRootHash);
     this.serializer = CheckingSerializerDecorator.from(serializer);
     this.hashFunction = checkNotNull(hashFunction);
-    expectedLeafDepth = getExpectedLeafDepth(numElements);
     elements = new TreeMap<>();
     index = 0;
     depth = 0;
-    isBalanced = true;
     hash = null;
   }
 
   private int getExpectedLeafDepth(long numElements) {
-    return (int) Math.round(Math.ceil(Math.log(numElements) / Math.log(2.0)));
+      return (int) Math.round(Math.ceil(Math.log(numElements) / Math.log(2.0)));
   }
 
   @Override
   public void visit(ListProofBranch branch) {
-    if (exceedsMaxBranchDepth()) {
-      // A proof tree where a branch node appears below the maximum allowed depth is not valid.
-      isBalanced = false;
-      return;
-    }
     long branchIndex = index;
     int branchDepth = depth;
     HashCode leftHash = visitLeft(branch, branchIndex, branchDepth);
@@ -136,20 +115,9 @@ public final class ListProofValidator<E> implements ListProofVisitor {
         "Error: already an element by such index in the map: i=" + index
             + ", e=" + elements.get(index);
 
-    isBalanced &= (depth == expectedLeafDepth);
-    if (isBalanced) {
-      E element = serializer.fromBytes(value.getElement());
-      elements.put(index, element);
-      hash = hashFunction.hashObject(value, ProofListElement.funnel());
-    }
-  }
-
-  /**
-   * Returns true if the branch node exceeds the maximum depth at which branch nodes may appear
-   * (expectedLeafDepth - 1).
-   */
-  private boolean exceedsMaxBranchDepth() {
-    return depth >= expectedLeafDepth;
+    E element = serializer.fromBytes(value.getElement());
+    elements.put(index, element);
+    hash = hashFunction.hashObject(value, ProofListElement.funnel());
   }
 
   private HashCode visitLeft(ListProofBranch branch, long branchIndex, int branchDepth) {
@@ -175,7 +143,11 @@ public final class ListProofValidator<E> implements ListProofVisitor {
    * Returns true if this proof is valid.
    */
   public boolean isValid() {
-    return isBalanced && !elements.isEmpty() && doesHashMatchExpected();
+    return !elements.isEmpty() && isBalanced() && doesHashMatchExpected();
+  }
+
+  private boolean isBalanced() {
+    return getExpectedLeafDepth(elements.size()) >= depth;
   }
 
   private boolean doesHashMatchExpected() {
@@ -193,10 +165,10 @@ public final class ListProofValidator<E> implements ListProofVisitor {
   }
 
   private String getReason() {
-    if (!isBalanced) {
-      return "a value node appears at the wrong level";
-    } else if (elements.isEmpty()) {
+    if (elements.isEmpty()) {
       return "the tree does not contain any value nodes";
+    } else if (!isBalanced()) {
+      return "a value node appears at the wrong level";
     } else if (!doesHashMatchExpected()) {
       return "hash mismatch: expected=" + expectedRootHash
           + ", actual=" + hash;
@@ -210,9 +182,9 @@ public final class ListProofValidator<E> implements ListProofVisitor {
     return "ListProofValidator{"
         + "hash=" + hash
         + ", expectedRootHash=" + expectedRootHash
-        + ", isBalanced=" + isBalanced
+        + ", isBalanced=" + isBalanced()
         + ", elements=" + elements
-        + ", expectedLeafDepth=" + expectedLeafDepth
+        + ", expectedLeafDepth=" + getExpectedLeafDepth(elements.size())
         + ", depth=" + depth
         + ", index=" + index
         + '}';

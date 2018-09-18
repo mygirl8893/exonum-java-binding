@@ -73,26 +73,13 @@ public class ListProofValidatorTest {
   }
 
   @Test
-  public void constructorRejectsZeroSize() {
-    expectedException.expect(IllegalArgumentException.class);
-    validator = createListProofValidator(0);
-  }
-
-  @Test
-  public void constructorRejectsNegativeSize() {
-    expectedException.expect(IllegalArgumentException.class);
-    validator = createListProofValidator(-1);
-  }
-
-  @Test
   @SuppressWarnings("unchecked")
   public void visit_SingletonListProof() {
     ListProof root = leafOf(V1);
     when(hashFunction.hashObject(eq(root), any(Funnel.class)))
         .thenReturn(ROOT_HASH);
 
-    int listSize = 1;
-    validator = createListProofValidator(listSize);
+    validator = createListProofValidator();
     root.accept(validator);
 
     assertTrue(validator.isValid());
@@ -114,8 +101,7 @@ public class ListProofValidatorTest {
         .hash())
         .thenReturn(ROOT_HASH);
 
-    int listSize = 2;
-    validator = createListProofValidator(listSize);
+    validator = createListProofValidator();
     validator.visit(root);
 
     assertTrue(validator.isValid());
@@ -138,8 +124,7 @@ public class ListProofValidatorTest {
 
     when(hasher.hash()).thenReturn(ROOT_HASH);
 
-    int listSize = 4;
-    validator = createListProofValidator(listSize);
+    validator = createListProofValidator();
     validator.visit(root);
 
     assertTrue(validator.isValid());
@@ -159,8 +144,7 @@ public class ListProofValidatorTest {
 
     when(hasher.hash()).thenReturn(H3); // Just always return H3
 
-    int listSize = 2;
-    validator = createListProofValidator(listSize);
+    validator = createListProofValidator();
     validator.visit(root);
 
     assertFalse(validator.isValid());
@@ -173,15 +157,13 @@ public class ListProofValidatorTest {
 
   @Test
   public void visit_IllegalProofOfSingletonTree() {
-    int listSize = 1;
-
     ProofListElement left = leafOf(V1);
     when(hashFunction.hashBytes(bytesOf(V1))).thenReturn(H1);
 
     // A proof for a list of size 1 must not contain branch nodes.
     ListProofBranch root = new ListProofBranch(left, null);
 
-    validator = createListProofValidator(listSize);
+    validator = createListProofValidator();
     validator.visit(root);
 
     assertFalse(validator.isValid());
@@ -189,8 +171,6 @@ public class ListProofValidatorTest {
 
   @Test
   public void visit_ProofLeftValue() {
-    int listSize = 2;
-
     ListProof left = leafOf(V1);
     when(hashFunction.hashBytes(bytesOf(V1))).thenReturn(H1);
 
@@ -198,7 +178,7 @@ public class ListProofValidatorTest {
 
     ListProofBranch root = new ListProofBranch(left, right);
 
-    validator = createListProofValidator(listSize);
+    validator = createListProofValidator();
     validator.visit(root);
 
     assertTrue(validator.isValid());
@@ -207,8 +187,6 @@ public class ListProofValidatorTest {
 
   @Test
   public void visit_ProofRightValue() {
-    int listSize = 2;
-
     ListProof left = new HashNode(H1);
 
     ListProof right = leafOf(V2);
@@ -216,7 +194,7 @@ public class ListProofValidatorTest {
 
     ListProofBranch root = new ListProofBranch(left, right);
 
-    validator = createListProofValidator(listSize);
+    validator = createListProofValidator();
     validator.visit(root);
 
     assertTrue(validator.isValid());
@@ -225,13 +203,11 @@ public class ListProofValidatorTest {
 
   @Test
   public void visit_InvalidBranchHashesAsChildren() {
-    int listSize = 2;
-
     ListProof left = new HashNode(H1);
     ListProof right = new HashNode(H2);
     ListProofBranch root = new ListProofBranch(left, right);
 
-    validator = createListProofValidator(listSize);
+    validator = createListProofValidator();
     validator.visit(root);
 
     assertFalse(validator.isValid());
@@ -242,12 +218,10 @@ public class ListProofValidatorTest {
 
   @Test
   public void visit_InvalidBranchLeftHashNoRight() {
-    int listSize = 2;
-
     ListProof left = new HashNode(H1);
     ListProofBranch root = new ListProofBranch(left, null);
 
-    validator = createListProofValidator(listSize);
+    validator = createListProofValidator();
     validator.visit(root);
 
     assertFalse(validator.isValid());
@@ -265,8 +239,7 @@ public class ListProofValidatorTest {
         leafOf(V3) // <-- A value at the wrong depth.
     );
 
-    int listSize = 3;
-    validator = createListProofValidator(listSize);
+    validator = createListProofValidator();
     validator.visit(root);
 
     assertFalse(validator.isValid());
@@ -284,8 +257,7 @@ public class ListProofValidatorTest {
             new HashNode(H3))
     );
 
-    int listSize = 3;
-    validator = createListProofValidator(listSize);
+    validator = createListProofValidator();
     validator.visit(root);
 
     assertFalse(validator.isValid());
@@ -301,8 +273,7 @@ public class ListProofValidatorTest {
     ListProof root = generateLeftLeaningProofTree(depth);
 
     // A list of size 4 has a height equal to 2, however, the proof tree exceeds that height.
-    long listSize = 4;
-    validator = createListProofValidator(listSize);
+    validator = createListProofValidator();
 
     root.accept(validator);
 
@@ -313,8 +284,8 @@ public class ListProofValidatorTest {
     validator.getElements();
   }
 
-  private ListProofValidator<String> createListProofValidator(long numElements) {
-    return new ListProofValidator<>(ROOT_HASH, numElements, StandardSerializers.string(),
+  private ListProofValidator<String> createListProofValidator() {
+    return new ListProofValidator<>(ROOT_HASH, StandardSerializers.string(),
         hashFunction);
   }
 

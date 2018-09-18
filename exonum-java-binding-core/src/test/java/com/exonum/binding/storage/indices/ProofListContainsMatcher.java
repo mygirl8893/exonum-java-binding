@@ -82,7 +82,7 @@ class ProofListContainsMatcher extends TypeSafeMatcher<ProofListIndexProxy<Strin
   }
 
   private ListProofValidator<String> newProofValidator(ProofListIndexProxy<String> list) {
-    return new ListProofValidator<>(list.getRootHash(), list.size(),
+    return new ListProofValidator<>(list.getRootHash(),
         StandardSerializers.string());
   }
 
